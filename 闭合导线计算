@@ -1,0 +1,70 @@
+[filename,p]=uigetfile('*.txt', '选择闭合导线文件');
+fp=fopen(strcat(p,filename),'r'); 
+
+%使用textcan读取文件
+data=textscan(fp,'%f %f %f %f\n','HeaderLines',1); %跳过第一行
+z1=cell2mat(data); %将元胞数组转化成数值型矩阵
+data=textscan(fp,'%f %f %f %f\n','HeaderLines',1);
+z2=cell2mat(data);
+data=textscan(fp,'%f %f %f %f\n','HeaderLines',1);
+z3=cell2mat(data);
+data=textscan(fp,'%f %f %f %f\n','HeaderLines',1);
+z4=cell2mat(data);
+data=textscan(fp,'%f %f %f %f %f %f %f %f %f\n','HeaderLines',1);
+z5=cell2mat(data);
+B1=z1(1);B2=z1(2)/60;B3=z1(3)/3600;B=B1+B2+B3; %角B，单位是度
+C1=z2(1);C2=z2(2)/60;C3=z2(3)/3600;C=C1+C2+C3; %角C，单位是度
+D1=z3(1);D2=z3(2)/60;D3=z3(3)/3600;D=D1+D2+D3; %角D，单位是度
+E1=z4(1);E2=z4(2)/60;E3=z4(3)/3600;E=E1+E2+E3; %角E，单位是度
+A1=z5(1);A2=z5(2)/60;A3=z5(3)/3600;A=A1+A2+A3; %角A，单位是度
+F1=z5(5);F2=z5(6)/60;F3=z5(7)/3600;F=F1+F2+F3; %方位角F
+x=z5(8);y=z5(9); %已知坐标
+Sab=z1(4);Sbc=z2(4);Scd=z3(4);Sde=z4(4);Sea=z5(4);
+Sz=Sab+Sbc+Scd+Sde+Sea; %总距离，单位是米
+
+%角度闭合与调差
+sjz=B+C+D+E+A; %实际测量值
+n=5;
+llz=(n-2)*180; %理论值
+f=sjz-llz; %闭合差
+k=f/Sz; %相对闭合差
+fz=f/n; %闭合差平均分配
+Bz=B+fz;
+Cz=C+fz;
+Dz=D+fz;
+Ez=E+fz;
+Az=A+fz;
+Bf=F+Bz-180; %方位角计算
+Cf=Bf+Cz-180;
+Df=Cf+Dz-180;
+Ef=Df+Ez-180;
+Af=Ef+Az+180;
+%坐标闭合差与调差
+Xab=Sab*cosd(Bf);Yab=Sab*sind(Bf);
+Xbc=Sbc*cosd(Cf);Ybc=Sbc*sind(Cf);
+Xcd=Scd*cosd(Df);Ycd=Scd*sind(Df);
+Xde=Sde*cosd(Ef);Yde=Sde*sind(Ef);
+Xea=Sea*cosd(Af);Yea=Sea*sind(Af);
+Xz=Xab+Xbc+Xcd+Xde+Xea;Yz=Yab+Ybc+Ycd+Yde+Yea; %各边长计算之和
+vXab=-(Xz/Sz*Sab);vYab=-(Yz/Sz*Sab); %按边长分配
+vXbc=-(Xz/Sz*Sbc);vYbc=-(Yz/Sz*Sbc);
+vXcd=-(Xz/Sz*Scd);vYcd=-(Yz/Sz*Scd);
+vXde=-(Xz/Sz*Sde);vYde=-(Yz/Sz*Sde);
+vXea=-(Xz/Sz*Sea);vYea=-(Yz/Sz*Sea);
+Xabm=Xab+vXab;Yabm=Yab+vYab; %改正后的值
+Xbcm=Xbc+vXbc;Ybcm=Ybc+vYbc;
+Xcdm=Xcd+vXcd;Ycdm=Ycd+vYcd;
+Xdem=Xde+vXde;Ydem=Yde+vYde;
+Xeam=Xea+vXea;Yeam=Yea+vYea;
+
+%各点的坐标计算
+xB=x+Xabm 
+yB=y+Yabm
+xC=x+Xbcm
+yC=y+Ybcm
+xD=x+Xcdm 
+yD=y+Ycdm
+xE=x+Xdem 
+yE=y+Ydem
+xA=x+Xeam 
+yA=y+Yeam
