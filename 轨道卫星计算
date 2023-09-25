@@ -1,0 +1,93 @@
+[filename,p]=uigetfile('*.txt', '选择GPS广播星历文件');
+fp=fopen(strcat(p,filename),'r');
+
+%使用textcan读取文件
+data=textscan(fp,'%f %f %f %f %f %f %f %f %f %f\n','HeaderLines',8);%跳过前8行
+B1=cell2mat(data); %将元胞数组转化成数值矩阵
+data=textscan(fp,'%f %f %f %f\n','HeaderLines',1);
+B2=cell2mat(data);
+data=textscan(fp,'%f %f %f %f\n','HeaderLines',1);
+B3=cell2mat(data);
+data=textscan(fp,'%f %f %f %f\n','HeaderLines',1);
+B4=cell2mat(data);
+data=textscan(fp,'%f %f %f %f\n','HeaderLines',1);
+B5=cell2mat(data);
+data=textscan(fp,'%f %f %f %f\n','HeaderLines',1);
+B6=cell2mat(data);
+data=textscan(fp,'%f %f %f %f\n','HeaderLines',1);
+B7=cell2mat(data);
+data=textscan(fp,'%f\n','HeaderLines',1);
+B8=cell2mat(data);
+
+%定义常量GM,Ve
+GM=3.986004e14;
+Ve=7.2921151467e-5;
+%求出轨道长半轴a
+sqrta=B3(4);
+a=sqrta^2;
+e=B3(2);
+%求出平均角速度n0
+n0=sqrt(GM/(a^3));
+XYZ=[];
+%计算从2022年3月1日00：00开始，每隔1分钟的卫星坐标
+for i=0:1:20
+    %计算当前时刻的儒略日
+    JulianDay=fix(365.25*(2022-1))+fix(30.6001*(3+13))+1+(0+i/60+0/3600)/24+1720981.5;
+    %将儒略日转换成GPS时
+	t2=(JulianDay-2444244.5)/7-fix((JulianDay-2444244.5)/7);
+    t=t2*604800;
+    %计算卫星钟差改正后的当前时刻的GPS时
+	t=t-(B1(8)+B1(9)*(t-B4(1))+B1(10)*(t-B4(1))^2);
+    %计算参考时刻的儒略日
+	JulianDayoe=fix(365.25*(2022-1))+fix(30.6001*(3+13))+1+(0+0/60+0/3600)/24+1720981.5;
+     %将儒略日转换成GPS时
+   	t2oe=(JulianDayoe-2444244.5)/7-fix((JulianDayoe-2444244.5)/7);
+    toe=t2oe*604800;
+    %计算时间差tk（归化时间tk）
+    tk=t-toe;
+    %计算改正平角速度
+    n=n0+B2(3);
+    %计算平近点角Mk
+    Mk=B2(4)+n*tk;
+%迭代计算，求出偏近点角Ek
+    Ek=Mk;
+    Ek0=inf; %inf相当于min,求最小
+    while abs(Ek0-Ek)>1e-100
+        Ek0=Ek;
+        Ek=Mk+e*sin(Ek0);
+    end
+    %计算真近点角
+	Sinfk=(sqrt(1-e^2)*sin(Ek))/(1-e*cos(Ek));
+    Cosfk=(cos(Ek)-e)/(1-e*cos(Ek));
+	fk=atan(Sinfk/Cosfk);
+    %计算升交角距
+    phik=fk+B5(3);
+    %从卫星星历文件中读取各个方向的振幅Crs,Cuc,Cus,Cic,Cis,Crc
+    Crs=B2(2);
+    Cuc=B3(1);
+    Cus=B3(3);
+    Cic=B4(2);
+    Cis=B4(4);
+    Crc=B5(2);
+%计算卫星轨道摄动项改正数
+    deltauk=Cus*sin(2*phik)+Cuc*cos(2*phik);
+	deltark=Crs*sin(2*phik)+Crc*cos(2*phik);
+	deltaik=Cis*sin(2*phik)+Cic*cos(2*phik);
+    %计算改正后的升交角距uk
+    uk=phik+deltauk;
+    %计算改正后的向径rk（卫星地心距rk）
+	rk=a*(1-e*cos(Ek))+deltark;
+    %计算改正后的倾角ik
+    ik=B5(1)+deltaik+B6(1)*tk;
+    %计算观测瞬间升交点的经度Lk
+	Lk=B4(3)+(B5(4)-Ve)*tk-Ve*B4(1);
+    %Lk=B4(3)+(B5(4)-B5(3))*t-B5(4)*toe;
+    %计算卫星在轨道平面内的坐标x,y,z
+	xyz=[rk*cos(uk);rk*sin(uk);0];
+    %计算旋转矩阵的值
+	RzRx=[cos(Lk),-sin(Lk)*cos(ik),sin(Lk)*sin(ik);sin(Lk),cos(Lk)*cos(ik),-cos(Lk)*sin(ik);0,sin(ik),cos(ik)];
+    %计算卫星在协议地球坐标系中的位置
+	XYZ=vpa([XYZ;1e-3*(RzRx*xyz)'],10); %vpa是设置有效数字的位数
+end
+XYZ
+ 
