@@ -1,0 +1,19 @@
+function [x2,y2]=zbzs(x1,y1,jl,raf) %坐标正算
+x2=x1+jl*cos(raf);
+y2=y1+jl*sin(raf);
+end
+
+
+
+
+function [raf,jl]=zbfs(xi,yj,xii,yjj) %坐标反算
+detx=abs(xii-xi);dety=abs(yjj-yj);
+faw1=atan(dety/detx);
+jl=sqrt(detx*detx+dety*dety);
+raf=faw1;
+if detx<0
+ raf=faw1+pi;
+end
+if (detx>0)*(dety<0)
+ raf=faw1+2*pi;
+end
