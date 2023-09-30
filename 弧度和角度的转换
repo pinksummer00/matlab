@@ -1,0 +1,19 @@
+function jrad=deg1rad(deg)
+degd=fix(deg); %取出度
+degf=(deg-degd)*100; %取出分
+degm=fix(degf);
+degs=degf-degm; %取出秒
+jrad=(degd+degm/60.00+degs/36.0)*pi/180.0;
+end
+
+
+
+
+function jdeg=rad1deg(rad)
+ rrad=rad*180/pi;
+deg=fix(rrad);
+xsbf=(rrad-deg)*60;
+ degf=fix(xsbf);
+degm=(xsbf-degf)*60;
+ jdeg=deg+degf/100.0+degm/10000.0;
+end
