@@ -1,0 +1,115 @@
+clear;
+clc;
+%起算数据
+x=[-86.15 -53.40 -14.78 10.46];
+y=[-68.99 82.21 -76.63 64.43];
+X=[36589.41 37631.08 39100.97 40426.54];
+Y=[25273.32 31324.51 24934.98 30319.81];
+Z=[2195.17 728.69 2386.50 757.31];
+f=153.24;
+ 
+%单位转换，mm2m
+x=x/1000;
+y=y/1000;
+f=f/1000;
+ 
+%计算比例尺m
+d1=sqrt((x(2)-x(1))^2+(y(2)-y(1))^2);
+D1=sqrt((X(2)-X(1))^2+(Y(2)-Y(1))^2);
+m1=D1/d1;
+d2=sqrt((x(4)-x(3))^2+(y(4)-y(3))^2);
+D2=sqrt((X(4)-X(3))^2+(Y(4)-Y(3))^2);
+m2=D2/d2;
+m=(m1+m2)/2;
+ 
+%确定外方位元素初始值
+Xs=mean(X(:));%取平均值
+Ys=mean(Y(:));
+Zs=m*f;
+phi=0;
+omg=0;
+kai=0;
+ 
+%设置迭代次数记录函数“dd”
+dd=-1;
+ 
+while(1)  %判断为真就循环
+%计算R矩阵及其系数
+    a1=cos(phi)*cos(kai)-sin(phi)*sin(omg)*sin(kai);
+    a2=-cos(phi)*sin(kai)-sin(phi)*sin(omg)*cos(kai);
+    a3=-sin(phi)*cos(omg);
+    b1=cos(omg)*sin(kai);
+    b2=cos(omg)*cos(kai);
+    b3=-sin(omg);
+    c1=sin(phi)*cos(kai)+cos(phi)*sin(omg)*sin(kai);
+    c2=-sin(phi)*sin(kai)+cos(phi)*sin(omg)*cos(kai);
+    c3=cos(phi)*cos(omg);
+    R=[a1 a2 a3; b1 b2 b3; c1 c2 c3];
+ 
+%构造辅助函数
+    for i=1:4
+    Xb(i)=a1*(X(i)-Xs)+b1*(Y(i)-Ys)+c1*(Z(i)-Zs);
+    Yb(i)=a2*(X(i)-Xs)+b2*(Y(i)-Ys)+c2*(Z(i)-Zs);
+    Zb(i)=a3*(X(i)-Xs)+b3*(Y(i)-Ys)+c3*(Z(i)-Zs);
+    end
+ 
+%计算影像坐标x，y近似值和常数项L
+    for i=1:4
+    xj(i) = -f*Xb(i)/Zb(i);
+    yj(i) = -f*Yb(i)/Zb(i);
+    L(2*i-1,1) = x(i)-xj(i);
+    L(2*i,1) = y(i)-yj(i);
+    end
+ 
+%计算A矩阵 
+    for i=1:4
+    A(2*i-1,1)=(a1*f+a3*x(i))/Zb(i);
+    A(2*i-1,2)=(b1*f+b3*x(i))/Zb(i);
+    A(2*i-1,3)=(c1*f+c3*x(i))/Zb(i);
+    A(2*i-1,4)=y(i)*sin(omg)-(x(i)*(x(i)*cos(kai)-y(i)*sin(kai))/f+f*cos(kai))*cos(omg);
+    A(2*i-1,5)=-f*sin(kai)-x(i)*(x(i)*sin(kai)+y(i)*cos(kai))/f;
+    A(2*i-1,6)=y(i);
+    A(2*i,1)=(a2*f+a3*y(i))/Zb(i);
+    A(2*i,2)=(b2*f+b3*y(i))/Zb(i);
+    A(2*i,3)=(c2*f+c3*y(i))/Zb(i);
+    A(2*i,4)=-x(i)*sin(omg)-(y(i)*(x(i)*cos(kai)-y(i)*sin(kai))/f-f*sin(kai))*cos(omg);
+    A(2*i,5)=-f*cos(kai)-y(i)*(x(i)*sin(kai)+y(i)*cos(kai))/f;
+    A(2*i,6)=-x(i);
+    end
+%误差方程为V=AX-L
+ 
+%迭代计算 
+     Xjie=inv(A'*A)*A'*L; %Xjie=[delta_Xs; delta_Ys; delta_Zs; delta_Psi; delta_Omega; delta_Kappa]
+     XX=Xjie+[Xs;Ys;Zs;phi;omg;kai];
+     Xs=XX(1);
+     Ys=XX(2);
+     Zs=XX(3);
+     phi=XX(4);
+     omg=XX(5);
+     kai=XX(6);
+     dd=dd+1;
+     V=A*Xjie-L;
+ 
+%判断改正数精度(小于0.1秒)
+%弧度转化为秒
+     delta_phi=Xjie(4)*180/pi*3600;
+     delta_omg=Xjie(5)*180/pi*3600;
+     delta_kai=Xjie(6)*180/pi*3600;
+     if(abs(delta_phi)<0.1 && abs(delta_omg)<0.1 && abs(delta_kai)<0.1) 
+         break;
+     end 
+end
+VV=0;
+for i=1:8
+    VV=VV+V(i,1)*V(i,1);
+end
+Qii=inv(A'*A);%外方位元素的精度
+m0=sqrt(VV/(2*4-6));%单位权中误差
+mi=sqrt(Qii)*m0;%第i个未知数的中误差即精度
+fprintf('迭代次数为%d次\n外方位元素为：\nXs=%.2f\nYs=%.2f\nZs=%.2f\n', dd,Xs,Ys,Zs);
+fprintf('平均比例尺为1:m = 1：%f\n3个旋转角为：\nphi=%f rad\nomg=%f rad\nkai=%f rad\n',m,phi,omg,kai);
+fprintf('单位权中误差m0=%f\nXs精度为：%f\nYs精度为：%f\nZs精度为：%f\n',m0,mi(1,1),mi(2,2),mi(3,3));
+fprintf('phi精度为：%f rad\nomg精度为：%f rad\nkai精度为：%f rad\n',mi(4,4),mi(5,5),mi(6,6));
+disp('R矩阵为：');
+disp(R);
+ 
